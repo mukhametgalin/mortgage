@@ -28,6 +28,7 @@ const DEFAULT_PARAMS: MortgageParams = {
   totalMonthlyBudget: 120_000,
   earlyRepaymentType: "reduce_term",
   expectedAppreciationPercent: 8,
+  investmentReturnPercent: 15,
 };
 
 function NumericInput({
@@ -177,6 +178,7 @@ export function MortgageCalculator() {
   );
 
   const roiPositive = result.roi > 0;
+  const buyingWins = result.rentingVsBuyingDiff > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -247,14 +249,37 @@ export function MortgageCalculator() {
             <h2 className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">
               Инвестиции
             </h2>
-            <NumericInput
-              label="Ожидаемый прирост стоимости в год"
-              value={params.expectedAppreciationPercent}
-              onChange={set("expectedAppreciationPercent")}
-              suffix="%"
-              step={0.5}
-              hint="Среднегодовой рост цены квартиры"
-            />
+            <div className="space-y-4">
+              <NumericInput
+                label="Ожидаемый прирост стоимости квартиры в год"
+                value={params.expectedAppreciationPercent}
+                onChange={set("expectedAppreciationPercent")}
+                suffix="%"
+                step={0.5}
+                hint="Среднегодовой рост цены"
+              />
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">
+              Сравнение со съёмом
+            </h2>
+            <div className="space-y-4">
+              <NumericInput
+                label="Доходность инвестиций в год"
+                value={params.investmentReturnPercent}
+                onChange={set("investmentReturnPercent")}
+                suffix="%"
+                step={0.5}
+                hint="Например: акции, облигации, депозит"
+              />
+              <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-1">
+                <p>Аренда = {formatMoney(result.rentMonthly)}/мес</p>
+                <p>Инвестиции = {formatMoney(result.rentMonthlyInvestment)}/мес</p>
+                <p className="text-[10px] opacity-70">Аренда ≈ средняя переплата по ипотеке</p>
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -294,7 +319,7 @@ export function MortgageCalculator() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                Инвестиционный потенциал
+                Инвестиционный потенциал покупки
                 <Badge variant={roiPositive ? "default" : "destructive"}>
                   {roiPositive ? "Выгодно" : "Убыток"}
                 </Badge>
@@ -328,6 +353,54 @@ export function MortgageCalculator() {
                   </p>
                   <p className="text-xs text-muted-foreground">CAGR за {formatMonths(result.totalMonths)}</p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Rent vs Buy block */}
+          <Card className={buyingWins ? "border-emerald-200" : "border-amber-200"}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                Покупка vs Аренда + инвестиции
+                <Badge variant={buyingWins ? "default" : "secondary"}>
+                  {buyingWins ? "Покупка выгоднее" : "Аренда выгоднее"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Scenario comparison row */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Buying scenario */}
+                <div className={`rounded-lg p-4 space-y-2 ${buyingWins ? "bg-emerald-50 border border-emerald-200" : "bg-muted/50"}`}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Покупка</p>
+                  <p className="text-2xl font-bold text-violet-600">{formatMoney(result.propertyValueAtEnd)}</p>
+                  <p className="text-xs text-muted-foreground">стоимость квартиры через {formatMonths(result.totalMonths)}</p>
+                  <div className="pt-1 space-y-0.5 text-xs text-muted-foreground">
+                    <p>— взнос: {formatMoney(params.downPayment)}</p>
+                    <p>— платежи: {formatMoney(result.totalPaid)}</p>
+                    <p>— рост {params.expectedAppreciationPercent}%/год</p>
+                  </div>
+                </div>
+
+                {/* Renting scenario */}
+                <div className={`rounded-lg p-4 space-y-2 ${!buyingWins ? "bg-amber-50 border border-amber-200" : "bg-muted/50"}`}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Аренда + инвестиции</p>
+                  <p className="text-2xl font-bold text-blue-600">{formatMoney(result.rentingEndWealth)}</p>
+                  <p className="text-xs text-muted-foreground">портфель через {formatMonths(result.totalMonths)}</p>
+                  <div className="pt-1 space-y-0.5 text-xs text-muted-foreground">
+                    <p>— аренда: {formatMoney(result.rentMonthly)}/мес</p>
+                    <p>— инвестиции: {formatMoney(result.rentMonthlyInvestment)}/мес</p>
+                    <p>— доходность {params.investmentReturnPercent}%/год</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Difference */}
+              <div className="rounded-lg bg-muted/50 px-4 py-3 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Разница в пользу {buyingWins ? "покупки" : "аренды"}:</span>
+                <span className={`text-xl font-bold ${buyingWins ? "text-emerald-600" : "text-amber-600"}`}>
+                  {formatMoney(Math.abs(result.rentingVsBuyingDiff))}
+                </span>
               </div>
             </CardContent>
           </Card>

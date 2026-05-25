@@ -7,6 +7,7 @@ export interface MortgageParams {
   totalMonthlyBudget: number;
   earlyRepaymentType: EarlyRepaymentType;
   expectedAppreciationPercent: number;
+  investmentReturnPercent: number;
 }
 
 export interface MonthlySnapshot {
@@ -27,12 +28,17 @@ export interface MortgageResult {
   totalPaid: number;
   totalInterest: number;
   avgMonthlyOverpayment: number;
-  // investment
+  // buying investment
   propertyValueAtEnd: number;
   investmentReturn: number;
   totalInvested: number;
   roi: number;
   roiAnnualized: number;
+  // rent vs buy
+  rentMonthly: number;
+  rentMonthlyInvestment: number;
+  rentingEndWealth: number;
+  rentingVsBuyingDiff: number;
 }
 
 function annuityPayment(principal: number, monthlyRate: number, months: number): number {
@@ -49,18 +55,15 @@ export function calculate(params: MortgageParams): MortgageResult {
     totalMonthlyBudget,
     earlyRepaymentType,
     expectedAppreciationPercent,
+    investmentReturnPercent,
   } = params;
 
   const loanAmount = propertyPrice - downPayment;
   const monthlyRate = annualRate / 100 / 12;
 
-  // Standard annuity payment (without extra)
-  // We don't know term upfront when user sets a budget — figure out max affordable term first
-  // Standard term: 30 years (360 months) as baseline
   const maxTermMonths = 360;
   let basePayment = annuityPayment(loanAmount, monthlyRate, maxTermMonths);
 
-  // Extra money beyond minimum annuity payment goes toward early repayment
   const schedule: MonthlySnapshot[] = [];
   let balance = loanAmount;
   let currentPayment = basePayment;
@@ -73,7 +76,6 @@ export function calculate(params: MortgageParams): MortgageResult {
     const interestCharge = balance * monthlyRate;
     const regularPrincipal = currentPayment - interestCharge;
 
-    // Extra amount available for early repayment
     const extra = Math.max(0, totalMonthlyBudget - currentPayment);
     const extraPrincipal = Math.min(extra, balance - regularPrincipal);
     const totalPrincipal = Math.min(regularPrincipal + extraPrincipal, balance);
@@ -95,7 +97,6 @@ export function calculate(params: MortgageParams): MortgageResult {
 
     if (balance <= 0.01) break;
 
-    // Recalculate payment if reducing monthly payment (not term)
     if (earlyRepaymentType === "reduce_payment" && extraPrincipal > 0 && balance > 0) {
       const remainingMonths = maxTermMonths - month;
       if (remainingMonths > 0) {
@@ -108,7 +109,7 @@ export function calculate(params: MortgageParams): MortgageResult {
   const totalInterest = totalInterestPaid;
   const avgMonthlyOverpayment = totalInterest / totalMonths;
 
-  // Investment analysis
+  // Buying: investment analysis
   const years = totalMonths / 12;
   const propertyValueAtEnd =
     propertyPrice * Math.pow(1 + expectedAppreciationPercent / 100, years);
@@ -116,6 +117,26 @@ export function calculate(params: MortgageParams): MortgageResult {
   const totalInvested = downPayment + totalPaid;
   const roi = ((propertyValueAtEnd - totalInvested) / totalInvested) * 100;
   const roiAnnualized = (Math.pow(propertyValueAtEnd / totalInvested, 1 / years) - 1) * 100;
+
+  // Renting scenario:
+  // - rent = avgMonthlyOverpayment (the "pure cost of money" = interest portion)
+  // - down payment is not spent upfront → invested from day 0
+  // - each month: save (totalMonthlyBudget - rent) and invest it
+  const rentMonthly = avgMonthlyOverpayment;
+  const rentMonthlyInvestment = totalMonthlyBudget - rentMonthly;
+  const monthlyInvestRate = investmentReturnPercent / 100 / 12;
+
+  const fvDownPayment = downPayment * Math.pow(1 + monthlyInvestRate, totalMonths);
+  const fvMonthly =
+    monthlyInvestRate > 0
+      ? rentMonthlyInvestment *
+        (Math.pow(1 + monthlyInvestRate, totalMonths) - 1) /
+        monthlyInvestRate
+      : rentMonthlyInvestment * totalMonths;
+
+  const rentingEndWealth = fvDownPayment + fvMonthly;
+  // positive = buying wins, negative = renting wins
+  const rentingVsBuyingDiff = propertyValueAtEnd - rentingEndWealth;
 
   return {
     loanAmount,
@@ -130,6 +151,10 @@ export function calculate(params: MortgageParams): MortgageResult {
     totalInvested,
     roi,
     roiAnnualized,
+    rentMonthly,
+    rentMonthlyInvestment,
+    rentingEndWealth,
+    rentingVsBuyingDiff,
   };
 }
 
