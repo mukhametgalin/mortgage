@@ -32,6 +32,7 @@ export interface MortgageResult {
   investmentReturn: number;
   totalInvested: number;
   roi: number;
+  roiAnnualized: number;
 }
 
 function annuityPayment(principal: number, monthlyRate: number, months: number): number {
@@ -114,6 +115,7 @@ export function calculate(params: MortgageParams): MortgageResult {
   const investmentReturn = propertyValueAtEnd - propertyPrice;
   const totalInvested = downPayment + totalPaid;
   const roi = ((propertyValueAtEnd - totalInvested) / totalInvested) * 100;
+  const roiAnnualized = (Math.pow(propertyValueAtEnd / totalInvested, 1 / years) - 1) * 100;
 
   return {
     loanAmount,
@@ -127,6 +129,7 @@ export function calculate(params: MortgageParams): MortgageResult {
     investmentReturn,
     totalInvested,
     roi,
+    roiAnnualized,
   };
 }
 

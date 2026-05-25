@@ -301,7 +301,7 @@ export function MortgageCalculator() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Стоимость через {formatMonths(result.totalMonths)}</p>
                   <p className="text-lg font-bold text-violet-600">{formatMoney(result.propertyValueAtEnd)}</p>
@@ -319,6 +319,14 @@ export function MortgageCalculator() {
                   <p className="text-xs text-muted-foreground">
                     взнос + платежи = {formatMoney(result.totalInvested)}
                   </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">ROI среднегодовой</p>
+                  <p className={`text-lg font-bold ${result.roiAnnualized > 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    {result.roiAnnualized > 0 ? "+" : ""}
+                    {result.roiAnnualized.toFixed(1)}%/год
+                  </p>
+                  <p className="text-xs text-muted-foreground">CAGR за {formatMonths(result.totalMonths)}</p>
                 </div>
               </div>
             </CardContent>
