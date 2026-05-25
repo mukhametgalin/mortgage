@@ -30,7 +30,7 @@ export interface MortgageResult {
   // investment
   propertyValueAtEnd: number;
   investmentReturn: number;
-  investmentReturnPercent: number;
+  totalInvested: number;
   roi: number;
 }
 
@@ -112,8 +112,6 @@ export function calculate(params: MortgageParams): MortgageResult {
   const propertyValueAtEnd =
     propertyPrice * Math.pow(1 + expectedAppreciationPercent / 100, years);
   const investmentReturn = propertyValueAtEnd - propertyPrice;
-  const investmentReturnPercent = (investmentReturn / downPayment) * 100;
-  // ROI: (property value at end - total cost) / total invested
   const totalInvested = downPayment + totalPaid;
   const roi = ((propertyValueAtEnd - totalInvested) / totalInvested) * 100;
 
@@ -127,7 +125,7 @@ export function calculate(params: MortgageParams): MortgageResult {
     avgMonthlyOverpayment,
     propertyValueAtEnd,
     investmentReturn,
-    investmentReturnPercent,
+    totalInvested,
     roi,
   };
 }
