@@ -7,6 +7,9 @@ import {
   BarChart,
   Bar,
   Cell,
+  LineChart,
+  Line,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -140,6 +143,21 @@ function buildChartData(schedule: ReturnType<typeof calculate>["schedule"]) {
   return points;
 }
 
+function buildPaymentComposition(schedule: ReturnType<typeof calculate>["schedule"]) {
+  if (!schedule.length) return [];
+  const step = Math.max(1, Math.floor(schedule.length / 36));
+  const points = [];
+  for (let i = step - 1; i < schedule.length; i += step) {
+    const s = schedule[i];
+    points.push({
+      month: s.month,
+      principal: Math.round(s.principal / 1000),
+      interest: Math.round(s.interest / 1000),
+    });
+  }
+  return points;
+}
+
 function buildPaymentBreakdown(
   schedule: ReturnType<typeof calculate>["schedule"],
   loanAmount: number,
@@ -166,6 +184,16 @@ export function MortgageCalculator() {
 
   const result = useMemo(() => calculate(params), [params]);
   const chartData = useMemo(() => buildChartData(result.schedule), [result.schedule]);
+  const paymentComposition = useMemo(() => buildPaymentComposition(result.schedule), [result.schedule]);
+  const wealthData = useMemo(
+    () => result.wealthTimeline.map((p) => ({
+      month: p.month,
+      propertyValue: Math.round(p.propertyValue / 1000),
+      equity: Math.round(p.equity / 1000),
+      rentingPortfolio: Math.round(p.rentingPortfolio / 1000),
+    })),
+    [result.wealthTimeline]
+  );
   const breakdown = useMemo(
     () =>
       buildPaymentBreakdown(
@@ -406,12 +434,67 @@ export function MortgageCalculator() {
           </Card>
 
           {/* Charts */}
-          <Tabs defaultValue="balance">
-            <TabsList>
+          <Tabs defaultValue="wealth">
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="wealth">Богатство во времени</TabsTrigger>
+              <TabsTrigger value="composition">Состав платежа</TabsTrigger>
               <TabsTrigger value="balance">Остаток долга</TabsTrigger>
               <TabsTrigger value="interest">Накопленные проценты</TabsTrigger>
               <TabsTrigger value="breakdown">Структура</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="wealth" className="pt-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground font-medium">
+                    Накопленное богатство: покупка vs аренда + инвестиции (тыс ₽)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <LineChart data={wealthData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} label={{ value: "Месяц", position: "insideBottom", offset: -2, fontSize: 11 }} height={30} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(v, n) => [`${v} тыс ₽`, n]} labelFormatter={(l) => `Месяц ${l}`} />
+                      <Legend />
+                      <Line type="monotone" dataKey="propertyValue" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Стоимость квартиры" />
+                      <Line type="monotone" dataKey="equity" stroke="#3b82f6" strokeWidth={2} dot={false} strokeDasharray="5 3" name="Equity (квартира − долг)" />
+                      <Line type="monotone" dataKey="rentingPortfolio" stroke="#f59e0b" strokeWidth={2} dot={false} name="Портфель при аренде" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Фиолетовая линия — полная стоимость квартиры. Синяя пунктирная — ваш реальный капитал (с учётом долга). Жёлтая — портфель при сценарии аренды.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="composition" className="pt-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground font-medium">
+                    Состав ежемесячного платежа: тело vs проценты (тыс ₽)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={paymentComposition} stackOffset="none">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} label={{ value: "Месяц", position: "insideBottom", offset: -2, fontSize: 11 }} height={30} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(v, n) => [`${v} тыс ₽`, n]} labelFormatter={(l) => `Месяц ${l}`} />
+                      <Legend />
+                      <Bar dataKey="principal" stackId="a" fill="#3b82f6" name="Тело кредита" />
+                      <Bar dataKey="interest" stackId="a" fill="#f59e0b" name="Проценты" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    В начале большая часть платежа — проценты. Со временем доля тела кредита растёт. Резкие изменения — досрочное погашение.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="balance" className="pt-4">
               <Card>

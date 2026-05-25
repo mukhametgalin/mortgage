@@ -20,6 +20,13 @@ export interface MonthlySnapshot {
   totalInterestPaid: number;
 }
 
+export interface WealthPoint {
+  month: number;
+  propertyValue: number;
+  equity: number;
+  rentingPortfolio: number;
+}
+
 export interface MortgageResult {
   loanAmount: number;
   monthlyPayment: number;
@@ -39,6 +46,7 @@ export interface MortgageResult {
   rentMonthlyInvestment: number;
   rentingEndWealth: number;
   rentingVsBuyingDiff: number;
+  wealthTimeline: WealthPoint[];
 }
 
 function annuityPayment(principal: number, monthlyRate: number, months: number): number {
@@ -135,8 +143,29 @@ export function calculate(params: MortgageParams): MortgageResult {
       : rentMonthlyInvestment * totalMonths;
 
   const rentingEndWealth = fvDownPayment + fvMonthly;
-  // positive = buying wins, negative = renting wins
   const rentingVsBuyingDiff = propertyValueAtEnd - rentingEndWealth;
+
+  // Month-by-month wealth timeline (sampled every ~6 months for chart)
+  const SAMPLE_STEP = Math.max(1, Math.floor(totalMonths / 60));
+  const monthlyAppreciationRate = expectedAppreciationPercent / 100 / 12;
+  const wealthTimeline: WealthPoint[] = [];
+
+  for (let m = SAMPLE_STEP; m <= totalMonths; m += SAMPLE_STEP) {
+    const snap = schedule[m - 1];
+    const propVal = propertyPrice * Math.pow(1 + monthlyAppreciationRate, m);
+    const equity = propVal - (snap?.balance ?? 0);
+    const portfolio =
+      downPayment * Math.pow(1 + monthlyInvestRate, m) +
+      (monthlyInvestRate > 0
+        ? rentMonthlyInvestment * (Math.pow(1 + monthlyInvestRate, m) - 1) / monthlyInvestRate
+        : rentMonthlyInvestment * m);
+    wealthTimeline.push({ month: m, propertyValue: Math.round(propVal), equity: Math.round(equity), rentingPortfolio: Math.round(portfolio) });
+  }
+  // Always include last month
+  if (wealthTimeline[wealthTimeline.length - 1]?.month !== totalMonths) {
+    const propVal = propertyValueAtEnd;
+    wealthTimeline.push({ month: totalMonths, propertyValue: Math.round(propVal), equity: Math.round(propVal), rentingPortfolio: Math.round(rentingEndWealth) });
+  }
 
   return {
     loanAmount,
@@ -155,6 +184,7 @@ export function calculate(params: MortgageParams): MortgageResult {
     rentMonthlyInvestment,
     rentingEndWealth,
     rentingVsBuyingDiff,
+    wealthTimeline,
   };
 }
 
